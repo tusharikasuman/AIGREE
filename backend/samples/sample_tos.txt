@@ -1,0 +1,61 @@
+StreamNest Terms of Service
+Last updated: March 1, 2026
+
+These Terms of Service ("Terms") govern your use of the StreamNest website, mobile applications and streaming service (together, the "Service"), operated by StreamNest Media Inc. ("StreamNest", "we", "us"). StreamNest is a fictional company used for testing.
+
+1. Acceptance of Terms
+By creating an account, accessing or using the Service, you agree to be bound by these Terms. If you do not agree, do not use the Service. You must be at least 16 years old to create an account.
+
+2. Changes to These Terms
+We may modify these Terms at any time, at our sole discretion, without prior notice to you. Your continued use of the Service after any change constitutes your acceptance of the new Terms. It is your responsibility to review these Terms periodically.
+
+3. Subscriptions and Billing
+3.1 Free Trial. New members may receive a 14-day free trial. Unless you cancel at least 48 hours before the trial ends, your trial will automatically convert into a paid monthly subscription and we will charge the payment method on file.
+3.2 Automatic Renewal. Your subscription renews automatically at the end of each billing period at the then-current price until you cancel. We may increase subscription prices at any time; price changes take effect at your next billing period.
+3.3 No Refunds. All payments are non-refundable, including for partially used billing periods, unused content, or if your account is suspended or terminated for any reason.
+3.4 Taxes and Fees. You are responsible for all applicable taxes. We may charge a service fee of up to $4.99 per month for "premium processing", the amount of which may change without notice.
+
+4. Your Account
+You are responsible for maintaining the confidentiality of your password and for all activity under your account. You agree to notify us immediately of any unauthorized use.
+
+5. Cancellation
+You may cancel your subscription only by calling our Member Services line during business hours (Monday to Friday, 9am to 5pm Eastern Time). Cancellation requests sent by email or through the app will not be processed. Cancellation takes effect at the end of the current billing period. If you cancel during the first 6 months of an annual plan, an early termination fee equal to 50% of the remaining balance will apply.
+
+6. Termination by StreamNest
+We may suspend or terminate your account and access to the Service at any time, for any reason or no reason, with or without notice. Upon termination, your right to use the Service ends immediately and any content, playlists or watch history associated with your account may be permanently deleted.
+
+7. User Content
+7.1 You may upload reviews, comments, profile images and videos ("User Content"). You retain ownership of your User Content.
+7.2 By submitting User Content, you grant StreamNest a worldwide, perpetual, irrevocable, royalty-free, sublicensable and transferable license to use, reproduce, modify, adapt, publish, display, distribute and create derivative works from your User Content in any media now known or later developed, including for advertising and for training machine learning models.
+7.3 You waive any moral rights you may have in your User Content.
+
+8. Privacy and Data
+8.1 We collect information you provide (such as your name, email address, date of birth and payment details), and information collected automatically, including your viewing history, search queries, device identifiers, IP address, and precise geolocation.
+8.2 We may share your personal information with our affiliates, advertising partners, data brokers and other third parties for marketing, analytics and any other lawful business purpose. We may sell aggregated or individual-level data to third parties.
+8.3 We retain your personal information for as long as we deem necessary, including after your account is closed.
+8.4 We use cookies and similar tracking technologies across third-party websites and apps to build a profile of your interests. Disabling cookies may cause parts of the Service to stop working.
+8.5 You may request a copy of the personal data we hold about you by writing to privacy@streamnest.example. We will respond within 30 days.
+
+9. Acceptable Use
+You agree not to: (a) share your account credentials outside your household; (b) circumvent geographic restrictions; (c) copy, record or redistribute content; (d) use automated tools to access the Service; or (e) post unlawful, defamatory or infringing content.
+
+10. Disclaimer of Warranties
+THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND. WE DO NOT GUARANTEE THAT ANY PARTICULAR CONTENT WILL BE AVAILABLE OR THAT THE SERVICE WILL BE UNINTERRUPTED OR ERROR-FREE.
+
+11. Limitation of Liability
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, STREAMNEST'S TOTAL LIABILITY TO YOU FOR ANY CLAIM ARISING OUT OF THESE TERMS OR THE SERVICE SHALL NOT EXCEED TEN U.S. DOLLARS ($10.00). IN NO EVENT SHALL STREAMNEST BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL OR CONSEQUENTIAL DAMAGES, INCLUDING LOSS OF DATA.
+
+12. Indemnification
+You agree to indemnify and hold harmless StreamNest and its officers, employees and partners from any claims, damages, losses and legal fees arising from your use of the Service or your violation of these Terms.
+
+13. Dispute Resolution
+13.1 Arbitration. Any dispute arising out of or relating to these Terms or the Service will be resolved by final and binding individual arbitration, and not in court. You and StreamNest each waive the right to a trial by jury.
+13.2 Class Action Waiver. You agree that you may bring claims against StreamNest only in your individual capacity and not as a plaintiff or class member in any purported class or representative proceeding.
+13.3 Time Limit. Any claim must be filed within six (6) months after the claim arises, or it is permanently barred.
+13.4 Governing Law. These Terms are governed by the laws of the State of Delaware, and any arbitration will take place in Wilmington, Delaware.
+
+14. Accessibility
+We are committed to making the Service accessible. Subtitles and audio descriptions are available for most titles at no extra cost.
+
+15. Contact
+Questions about these Terms can be sent to legal@streamnest.example.
