@@ -24,7 +24,7 @@ export interface AnalysisResult {
 export type AnalyzeInput = { text: string } | { url: string };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const TIMEOUT_MS = 5 * 60 * 1000; // long documents are analysed in several AI calls
+const TIMEOUT_MS = 20 * 60 * 1000; // local models on a CPU can take several minutes
 
 export async function analyze(input: AnalyzeInput, signal?: AbortSignal): Promise<AnalysisResult> {
   const timeout = AbortSignal.timeout(TIMEOUT_MS);

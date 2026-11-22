@@ -151,7 +151,7 @@ export default function Home() {
 function LoadingCard() {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <p className="text-sm font-medium text-slate-700">Reading the fine print… this can take up to a minute for long documents.</p>
+      <p className="text-sm font-medium text-slate-700">Reading the fine print… with a local model this can take a few minutes.</p>
       <div className="mt-4 animate-pulse space-y-3">
         <div className="h-24 rounded-lg bg-slate-100" />
         <div className="h-3 w-3/4 rounded bg-slate-100" />

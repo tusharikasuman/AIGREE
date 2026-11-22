@@ -1,4 +1,4 @@
-"""Core pipeline: chunk -> analyze each chunk with Claude -> verify quotes -> merge."""
+"""Core pipeline: chunk -> analyze each chunk with the LLM -> verify quotes -> merge."""
 
 from __future__ import annotations
 
@@ -8,12 +8,12 @@ import logging
 import re
 from typing import TypeVar
 
-from anthropic import AsyncAnthropic
 from pydantic import BaseModel, ValidationError
 
 from . import config
 from .chunker import chunk_text, normalize
 from .prompts import merge_prompt, system_prompt
+from .providers import AnalysisError, Provider, make_provider
 from .schemas import (
     ANALYSIS_JSON_SCHEMA,
     MERGE_JSON_SCHEMA,
@@ -27,13 +27,8 @@ log = logging.getLogger("aigree.analyzer")
 T = TypeVar("T", bound=BaseModel)
 
 SEVERITY_RANK = {"high": 3, "medium": 2, "low": 1}
-FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
-
-class AnalysisError(Exception):
-    def __init__(self, message: str, status_code: int = 502):
-        super().__init__(message)
-        self.status_code = status_code
+__all__ = ["Analyzer", "AnalysisError"]
 
 
 # ---------------------------------------------------------------------------
@@ -73,54 +68,36 @@ def dedupe_clauses(clauses: list[FlaggedClause]) -> list[FlaggedClause]:
 
 
 # ---------------------------------------------------------------------------
-# Claude calls
+# LLM calls
 # ---------------------------------------------------------------------------
 
 
 class Analyzer:
-    def __init__(self, client: AsyncAnthropic | None = None):
-        self.client = client or AsyncAnthropic()
+    def __init__(self, provider: Provider | None = None):
+        self.provider = provider or make_provider()
         self._sem = asyncio.Semaphore(config.MAX_PARALLEL_CHUNKS)
 
-    async def _create(self, system: str, messages: list, schema: dict):
-        kwargs = dict(
-            model=config.MODEL,
-            max_tokens=config.MAX_OUTPUT_TOKENS,
-            system=system,
-            messages=messages,
-            output_config={
-                "effort": config.EFFORT,
-                "format": {"type": "json_schema", "schema": schema},
-            },
-        )
-        if config.USE_FALLBACKS:
-            # If Claude declines, the API re-runs the request on a fallback model in the same call.
-            return await self.client.beta.messages.create(
-                **kwargs, betas=[FALLBACK_BETA], fallbacks="default"
-            )
-        return await self.client.messages.create(**kwargs)
-
     async def _call_validated(self, system: str, user_content: str, schema: dict, model_cls: type[T]) -> T:
-        """Call Claude, validate with Pydantic, and retry once with the error if it fails."""
+        """Call the LLM, validate with Pydantic, and retry once with the error if it fails."""
         messages: list = [{"role": "user", "content": user_content}]
         last_error = ""
         for attempt in (1, 2):
             async with self._sem:
-                resp = await self._create(system, messages, schema)
+                resp = await self.provider.complete(system, messages, schema)
 
-            if resp.stop_reason == "refusal":
+            if resp.stop == "refusal":
                 raise AnalysisError("The AI declined to analyse this document.", status_code=422)
 
-            raw = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+            raw = _strip_fences(resp.text)
             try:
-                if resp.stop_reason == "max_tokens":
+                if resp.stop == "max_tokens":
                     raise ValueError("Output was cut off by the token limit; respond more concisely.")
                 return model_cls.model_validate_json(raw)
             except ValueError as e:  # pydantic.ValidationError subclasses ValueError
                 last_error = _short_error(e)
                 log.warning("Attempt %d returned invalid output: %s", attempt, last_error)
                 messages = messages + [
-                    {"role": "assistant", "content": resp.content},
+                    resp.assistant_message,
                     {
                         "role": "user",
                         "content": (
@@ -186,6 +163,15 @@ class Analyzer:
             sub_scores=merged.sub_scores,
             flagged_clauses=dedupe_clauses([c for p in parts for c in p.flagged_clauses]),
         )
+
+
+def _strip_fences(text: str) -> str:
+    """Some models wrap JSON in ```json fences even when asked not to."""
+    t = text.strip()
+    if t.startswith("```"):
+        t = re.sub(r"^```[a-zA-Z]*\s*", "", t)
+        t = re.sub(r"\s*```$", "", t)
+    return t
 
 
 def _short_error(e: Exception) -> str:
