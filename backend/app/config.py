@@ -34,6 +34,11 @@ API_KEY = (
 )
 TIMEOUT_SECONDS = int(os.getenv("AIGREE_TIMEOUT_SECONDS", str(_d[2])))
 
+# Retries with exponential backoff on 429/5xx/connection errors (OpenAI-compatible provider)
+MAX_RETRIES = int(os.getenv("AIGREE_MAX_RETRIES", "5"))
+# Backup model tried once if the main one is overloaded (503) or rate-limited (429). Empty = none.
+FALLBACK_MODEL = os.getenv("AIGREE_FALLBACK_MODEL", "").strip()
+
 # "openai" provider: json_schema (strict, OpenAI/OpenRouter) or json_object (wider support, e.g. DashScope)
 JSON_MODE = os.getenv("AIGREE_JSON_MODE", "json_schema").strip().lower()
 

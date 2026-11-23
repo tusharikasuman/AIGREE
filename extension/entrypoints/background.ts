@@ -1,6 +1,9 @@
 import { evalSnippets } from "@duckduckgo/autoconsent";
 import type { ContentScriptMessage } from "@duckduckgo/autoconsent";
 import { tabStatusKey, type TabStatus } from "@/utils/settings";
+import { API_URL, analysisKey, type AnalysisResult, type SiteAnalysis, type TermsLinks } from "@/utils/analysis";
+
+type AigreeMessage = { type: "aigree-analyze"; tabId: number; site: string };
 
 async function setStatus(tabId: number, patch: Partial<TabStatus>) {
   const key = tabStatusKey(tabId);
@@ -13,8 +16,53 @@ async function setStatus(tabId: number, patch: Partial<TabStatus>) {
   await browser.action.setBadgeBackgroundColor({ tabId, color });
 }
 
+/** Find the site's Terms (or Privacy) page, send it to the AIGREE backend, cache the result per site. */
+async function analyzeSite(tabId: number, site: string) {
+  const key = analysisKey(site);
+  const save = (value: SiteAnalysis) => browser.storage.local.set({ [key]: value });
+  await save({ status: "loading", at: Date.now() });
+
+  let links: TermsLinks = {};
+  try {
+    links = await browser.tabs.sendMessage(tabId, { type: "aigree-findTerms" }, { frameId: 0 });
+  } catch {
+    return save({ status: "error", at: Date.now(), error: "Reload the page and try again." });
+  }
+  const url = links?.self ?? links?.terms ?? links?.privacy;
+  if (!url) {
+    return save({
+      status: "error",
+      at: Date.now(),
+      error: "Couldn't find a Terms or Privacy link on this page. Open the site's Terms page and try again.",
+    });
+  }
+  await save({ status: "loading", url, at: Date.now() });
+
+  try {
+    const res = await fetch(`${API_URL}/analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const detail = Array.isArray(body.detail) ? body.detail.map((d: any) => d.msg).join(" ") : body.detail;
+      return save({ status: "error", url, at: Date.now(), error: detail || `The AIGREE server returned ${res.status}.` });
+    }
+    await save({ status: "done", url, at: Date.now(), result: body as AnalysisResult });
+  } catch {
+    await save({ status: "error", url, at: Date.now(), error: `Can't reach the AIGREE server at ${API_URL}. Is it running?` });
+  }
+}
+
 export default defineBackground(() => {
-  browser.runtime.onMessage.addListener((msg: ContentScriptMessage, sender) => {
+  browser.runtime.onMessage.addListener((msg: ContentScriptMessage | AigreeMessage, sender) => {
+    // From the popup (no sender tab)
+    if (msg.type === "aigree-analyze") {
+      analyzeSite(msg.tabId, msg.site);
+      return;
+    }
+
     const tabId = sender.tab?.id;
     const frameId = sender.frameId ?? 0;
     if (tabId === undefined) return;

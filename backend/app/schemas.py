@@ -49,6 +49,9 @@ def _check_summary(v: str) -> str:
 class AnalysisResult(BaseModel):
     """The final API response, and also what Claude returns for each chunk."""
 
+    # The model's verdict on whether the text is terms/policy at all. Used to reject
+    # non-terms input instead of scoring it; never sent to the client.
+    is_terms_document: bool = Field(default=True, exclude=True)
     summary: str = Field(min_length=1)
     trust_score: int = Field(ge=0, le=100)
     sub_scores: SubScores
@@ -105,12 +108,13 @@ _CLAUSE_SCHEMA = {
 ANALYSIS_JSON_SCHEMA = {
     "type": "object",
     "properties": {
+        "is_terms_document": {"type": "boolean"},
         "summary": {"type": "string"},
         "trust_score": {"type": "integer"},
         "sub_scores": _SUB_SCORES_SCHEMA,
         "flagged_clauses": {"type": "array", "items": _CLAUSE_SCHEMA},
     },
-    "required": ["summary", "trust_score", "sub_scores", "flagged_clauses"],
+    "required": ["is_terms_document", "summary", "trust_score", "sub_scores", "flagged_clauses"],
     "additionalProperties": False,
 }
 

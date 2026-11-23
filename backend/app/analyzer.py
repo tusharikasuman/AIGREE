@@ -68,6 +68,32 @@ def dedupe_clauses(clauses: list[FlaggedClause]) -> list[FlaggedClause]:
 
 
 # ---------------------------------------------------------------------------
+# Input sanity checks
+# ---------------------------------------------------------------------------
+
+NOT_TERMS_MESSAGE = (
+    "This doesn't look like a Terms & Conditions or Privacy Policy document, so it can't be scored. "
+    "Paste the full terms text, or use a link to the terms page."
+)
+
+_WORD = re.compile(r"[^\W\d_]+")
+
+
+def looks_like_prose(text: str) -> bool:
+    """Cheap check that catches keyboard-mash before spending an AI call on it.
+
+    Real terms are made of ordinary-length words; random typing is mostly very long runs of
+    letters. Language-neutral on purpose, so non-English terms still pass.
+    """
+    words = _WORD.findall(text)
+    if not words:
+        return False
+    letters = sum(len(w) for w in words)
+    normal = sum(len(w) for w in words if len(w) <= 20)
+    return len(words) >= 30 and normal / letters >= 0.8
+
+
+# ---------------------------------------------------------------------------
 # LLM calls
 # ---------------------------------------------------------------------------
 
@@ -144,12 +170,20 @@ class Analyzer:
                 f"The document is too long ({len(text):,} characters; limit {config.MAX_INPUT_CHARS:,}).",
                 status_code=413,
             )
+        if not looks_like_prose(text):
+            raise AnalysisError(NOT_TERMS_MESSAGE, status_code=422)
 
         chunks = chunk_text(text, config.CHUNK_CHARS, config.CHUNK_OVERLAP_CHARS)
         log.info("Analyzing %d chars in %d chunk(s)", len(text), len(chunks))
         parts = await asyncio.gather(
             *(self._analyze_chunk(c, i, len(chunks)) for i, c in enumerate(chunks))
         )
+
+        # Never turn "this isn't terms" into a score. In long documents, ignore parts that
+        # aren't terms (e.g. page navigation) and score the rest.
+        parts = [p for p in parts if p.is_terms_document]
+        if not parts:
+            raise AnalysisError(NOT_TERMS_MESSAGE, status_code=422)
 
         if len(parts) == 1:
             result = parts[0]
