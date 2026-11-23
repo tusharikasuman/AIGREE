@@ -79,6 +79,19 @@ npm run dev
 
 Open <http://localhost:3000>.
 
+### Docker (Ollama stays on the host)
+
+Start Ollama on your PC first, then:
+
+```powershell
+docker compose up -d --build backend    # backend only
+docker compose up -d --build            # backend + frontend
+docker compose logs -f backend
+docker compose down
+```
+
+The backend reads `backend/.env` and reaches the host's Ollama at `http://host.docker.internal:11434` (set via `AIGREE_OLLAMA_URL`). The frontend is a production build. `NEXT_PUBLIC_API_URL` is baked in at build time (default `http://localhost:8000`), so rebuild after changing it.
+
 ### CLI
 
 ```powershell

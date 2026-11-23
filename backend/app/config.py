@@ -15,7 +15,7 @@ PROVIDER = os.getenv("AIGREE_PROVIDER", "ollama").strip().lower()
 
 _DEFAULTS = {
     #           model                 base URL                    timeout(s) parallel chunk chars
-    "ollama": ("qwen2.5:3b",        "http://localhost:11434",   1200,      1,       12000),
+    "ollama": ("qwen2.5:3b",        os.getenv("AIGREE_OLLAMA_URL", "http://localhost:11434"), 1200, 1, 12000),
     "openai": ("gpt-4o-mini",       "",                         300,       4,       30000),
     "claude": ("claude-opus-5-5",   "",                         600,       4,       30000),
 }
