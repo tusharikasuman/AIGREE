@@ -130,7 +130,7 @@ Other settings:
 | `AIGREE_MAX_INPUT_CHARS` | `400000` | Larger inputs are rejected (413) |
 | `AIGREE_CORS_ORIGINS` | `http://localhost:3000` | Comma-separated |
 
-Restart the backend after editing `.env`.
+Restart the backend after editing `.env`. With Docker, use `docker compose up -d --force-recreate backend`. A plain `restart` keeps the old settings.
 
 ## Tuning the AI
 
