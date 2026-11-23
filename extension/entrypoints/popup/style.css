@@ -30,3 +30,22 @@ button:disabled { opacity: 0.45; cursor: default; }
 button.link { border: 0; padding: 0; color: var(--accent); text-decoration: underline; }
 .check, .radio { display: flex; gap: 8px; align-items: center; margin-top: 8px; cursor: pointer; }
 .remembered, .hint { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+
+/* Trust score */
+.card > button { width: 100%; margin-top: 4px; }
+.score { margin-bottom: 10px; }
+.score-head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+.score-num { font-size: 34px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.band { font-weight: 600; }
+.good { color: var(--ok); } .fair { color: var(--warn); } .poor { color: var(--bad); }
+.source { color: var(--muted); font-size: 12px; display: block; max-width: 220px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.subs { display: grid; gap: 4px; font-size: 12px; }
+.sub { display: grid; grid-template-columns: 80px 1fr 24px; gap: 8px; align-items: center; }
+.bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.bar > span { display: block; height: 100%; }
+.bar > .good { background: var(--ok); } .bar > .fair { background: var(--warn); } .bar > .poor { background: var(--bad); }
+.sub-num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.clauses { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; font-size: 12px; }
+.clauses li { padding: 6px 8px; border-left: 3px solid var(--warn); background: var(--bg); border-radius: 4px; }
+.clauses li.high { border-left-color: var(--bad); }

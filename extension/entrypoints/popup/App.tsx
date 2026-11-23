@@ -9,6 +9,7 @@ import {
   type Settings,
   type TabStatus,
 } from "@/utils/settings";
+import TermsCard from "./TermsCard";
 
 const CHOICE_LABEL: Record<CookieChoice, string> = {
   optOut: "Necessary only",
@@ -107,6 +108,8 @@ export default function App() {
           </p>
         )}
       </section>
+
+      {tab?.host && <TermsCard tabId={tab.id} site={siteKey(tab.host)} />}
 
       <section className="card">
         <h2>On every other site</h2>

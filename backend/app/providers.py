@@ -12,12 +12,15 @@ so the rest of the app doesn't care which one is in use.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any, Protocol
 
 import httpx
 
 from . import config
+
+log = logging.getLogger("aigree.providers")
 
 
 class AnalysisError(Exception):
@@ -105,7 +108,7 @@ class OpenAICompatProvider:
             api_key=config.API_KEY,
             base_url=config.BASE_URL or None,
             timeout=config.TIMEOUT_SECONDS,
-            max_retries=2,
+            max_retries=config.MAX_RETRIES,  # exponential backoff; free tiers often return 503 when busy
         )
 
     def _response_format(self, schema: dict) -> dict:
@@ -113,14 +116,24 @@ class OpenAICompatProvider:
             return {"type": "json_schema", "json_schema": {"name": "result", "schema": schema, "strict": True}}
         return {"type": "json_object"}
 
+    async def _create(self, model: str, system: str, messages: list[dict], schema: dict):
+        return await self.client.chat.completions.create(
+            model=model,
+            messages=[{"role": "system", "content": system + schema_instructions(schema)}, *messages],
+            response_format=self._response_format(schema),
+        )
+
     async def complete(self, system: str, messages: list[dict], schema: dict) -> Completion:
         oa = self.openai
         try:
-            resp = await self.client.chat.completions.create(
-                model=config.MODEL,
-                messages=[{"role": "system", "content": system + schema_instructions(schema)}, *messages],
-                response_format=self._response_format(schema),
-            )
+            try:
+                resp = await self._create(config.MODEL, system, messages, schema)
+            except oa.APIStatusError as e:
+                # Overloaded (503) or rate-limited (429) even after retries: try the backup model once.
+                if e.status_code not in (429, 503) or not config.FALLBACK_MODEL:
+                    raise
+                log.warning("%s returned %s; falling back to %s", config.MODEL, e.status_code, config.FALLBACK_MODEL)
+                resp = await self._create(config.FALLBACK_MODEL, system, messages, schema)
         except oa.AuthenticationError:
             raise AnalysisError("Invalid API key. Check AIGREE_API_KEY in backend/.env.", 500)
         except oa.RateLimitError:
