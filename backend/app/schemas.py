@@ -1,4 +1,4 @@
-"""Pydantic models: API request/response and the strict shape Claude must return."""
+"""Pydantic models: API request/response and the strict shape the AI must return."""
 
 from __future__ import annotations
 
@@ -6,9 +6,12 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
-Severity = Literal["low", "medium", "high"]
+from .checklist import CHECK_IDS
 
-# Fixed category list keeps the UI consistent. Edit together with prompts/system_prompt.md.
+Severity = Literal["low", "medium", "high"]
+Tier = Literal["serious", "notable", "standard", "good", "other"]
+
+# Fixed category list keeps the UI consistent.
 Category = Literal[
     "Data Privacy",
     "Financial",
@@ -25,6 +28,63 @@ CATEGORIES: list[str] = list(Category.__args__)  # type: ignore[attr-defined]
 SUMMARY_MAX_WORDS = 150
 
 
+def _check_summary(v: str) -> str:
+    words = len(v.split())
+    if words > SUMMARY_MAX_WORDS:
+        raise ValueError(f"summary has {words} words; must be under {SUMMARY_MAX_WORDS}")
+    return v
+
+
+# ---- What the AI returns for each chunk -----------------------------------
+
+
+class Finding(BaseModel):
+    """A checklist item the AI found in the document."""
+
+    check_id: str
+    original_text: str = Field(min_length=1)
+    explanation: str = Field(min_length=1)
+    what_you_can_do: str = ""
+
+    @field_validator("check_id")
+    @classmethod
+    def known_check(cls, v: str) -> str:
+        if v not in CHECK_IDS:
+            raise ValueError(f"unknown check_id '{v}'")
+        return v
+
+
+class OtherConcern(BaseModel):
+    """Something worth flagging that isn't on the checklist."""
+
+    category: Category
+    severity: Literal["medium", "high"]
+    label: str = Field(min_length=1)
+    original_text: str = Field(min_length=1)
+    explanation: str = Field(min_length=1)
+    what_you_can_do: str = ""
+
+
+class ChunkAnalysis(BaseModel):
+    is_terms_document: bool
+    summary: str = Field(min_length=1)
+    findings: list[Finding]
+    other_concerns: list[OtherConcern]
+
+    _summary_len = field_validator("summary")(_check_summary)
+
+
+class MergeResult(BaseModel):
+    """For long documents: one summary written from the per-part summaries."""
+
+    summary: str = Field(min_length=1)
+
+    _summary_len = field_validator("summary")(_check_summary)
+
+
+# ---- API -------------------------------------------------------------------
+
+
 class SubScores(BaseModel):
     data_privacy: int = Field(ge=0, le=100)
     financial_risk: int = Field(ge=0, le=100)
@@ -33,41 +93,25 @@ class SubScores(BaseModel):
 
 
 class FlaggedClause(BaseModel):
+    check_id: str  # checklist id, or "other"
+    label: str
     category: Category
+    tier: Tier
     severity: Severity
-    original_text: str = Field(min_length=1)
-    explanation: str = Field(min_length=1)
-
-
-def _check_summary(v: str) -> str:
-    words = len(v.split())
-    if words > SUMMARY_MAX_WORDS:
-        raise ValueError(f"summary has {words} words; must be under {SUMMARY_MAX_WORDS}")
-    return v
+    points: int  # effect on the trust score: negative = penalty, positive = good sign
+    original_text: str
+    explanation: str
+    what_you_can_do: str
 
 
 class AnalysisResult(BaseModel):
-    """The final API response, and also what Claude returns for each chunk."""
-
-    # The model's verdict on whether the text is terms/policy at all. Used to reject
-    # non-terms input instead of scoring it; never sent to the client.
-    is_terms_document: bool = Field(default=True, exclude=True)
-    summary: str = Field(min_length=1)
+    summary: str
     trust_score: int = Field(ge=0, le=100)
+    grade: Literal["A", "B", "C", "D", "E"]
+    grade_label: str
     sub_scores: SubScores
+    score_notes: list[str]  # plain-language explanation of how the score was reached
     flagged_clauses: list[FlaggedClause]
-
-    _summary_len = field_validator("summary")(_check_summary)
-
-
-class MergeResult(BaseModel):
-    """What the merge step returns: whole-document summary + scores (clauses merged in code)."""
-
-    summary: str = Field(min_length=1)
-    trust_score: int = Field(ge=0, le=100)
-    sub_scores: SubScores
-
-    _summary_len = field_validator("summary")(_check_summary)
 
 
 class AnalyzeRequest(BaseModel):
@@ -82,26 +126,32 @@ class AnalyzeRequest(BaseModel):
         return self
 
 
-# ---- JSON Schemas sent to Claude's structured-output mode -------------------
-# Hand-written (not model_json_schema()) to stay within the structured-output
-# subset. Numeric ranges and the word limit are enforced by Pydantic above.
+# ---- JSON Schemas sent to the AI's structured-output mode -------------------
+# Hand-written to stay within the structured-output subset.
 
-_SUB_SCORES_SCHEMA = {
+_FINDING_SCHEMA = {
     "type": "object",
-    "properties": {k: {"type": "integer"} for k in SubScores.model_fields},
-    "required": list(SubScores.model_fields),
+    "properties": {
+        "check_id": {"type": "string", "enum": CHECK_IDS},
+        "original_text": {"type": "string"},
+        "explanation": {"type": "string"},
+        "what_you_can_do": {"type": "string"},
+    },
+    "required": ["check_id", "original_text", "explanation", "what_you_can_do"],
     "additionalProperties": False,
 }
 
-_CLAUSE_SCHEMA = {
+_OTHER_SCHEMA = {
     "type": "object",
     "properties": {
         "category": {"type": "string", "enum": CATEGORIES},
-        "severity": {"type": "string", "enum": ["low", "medium", "high"]},
+        "severity": {"type": "string", "enum": ["medium", "high"]},
+        "label": {"type": "string"},
         "original_text": {"type": "string"},
         "explanation": {"type": "string"},
+        "what_you_can_do": {"type": "string"},
     },
-    "required": ["category", "severity", "original_text", "explanation"],
+    "required": ["category", "severity", "label", "original_text", "explanation", "what_you_can_do"],
     "additionalProperties": False,
 }
 
@@ -110,21 +160,16 @@ ANALYSIS_JSON_SCHEMA = {
     "properties": {
         "is_terms_document": {"type": "boolean"},
         "summary": {"type": "string"},
-        "trust_score": {"type": "integer"},
-        "sub_scores": _SUB_SCORES_SCHEMA,
-        "flagged_clauses": {"type": "array", "items": _CLAUSE_SCHEMA},
+        "findings": {"type": "array", "items": _FINDING_SCHEMA},
+        "other_concerns": {"type": "array", "items": _OTHER_SCHEMA},
     },
-    "required": ["is_terms_document", "summary", "trust_score", "sub_scores", "flagged_clauses"],
+    "required": ["is_terms_document", "summary", "findings", "other_concerns"],
     "additionalProperties": False,
 }
 
 MERGE_JSON_SCHEMA = {
     "type": "object",
-    "properties": {
-        "summary": {"type": "string"},
-        "trust_score": {"type": "integer"},
-        "sub_scores": _SUB_SCORES_SCHEMA,
-    },
-    "required": ["summary", "trust_score", "sub_scores"],
+    "properties": {"summary": {"type": "string"}},
+    "required": ["summary"],
     "additionalProperties": False,
 }

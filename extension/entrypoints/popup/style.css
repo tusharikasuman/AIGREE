@@ -35,8 +35,14 @@ button.link { border: 0; padding: 0; color: var(--accent); text-decoration: unde
 .card > button { width: 100%; margin-top: 4px; }
 .score { margin-bottom: 10px; }
 .score-head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
-.score-num { font-size: 34px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.grade { font-size: 40px; font-weight: 800; line-height: 1; min-width: 32px; text-align: center; }
 .band { font-weight: 600; }
+.score-of { font-variant-numeric: tabular-nums; }
+.note { margin: 0 0 8px; color: var(--muted); font-size: 12px; }
+.clause-head { display: flex; justify-content: space-between; gap: 8px; }
+.pts { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tip { margin-top: 4px; padding-top: 4px; border-top: 1px dashed var(--border); }
+.good-signs { margin: 8px 0 0; color: var(--ok); font-size: 12px; }
 .good { color: var(--ok); } .fair { color: var(--warn); } .poor { color: var(--bad); }
 .source { color: var(--muted); font-size: 12px; display: block; max-width: 220px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -48,4 +54,4 @@ button.link { border: 0; padding: 0; color: var(--accent); text-decoration: unde
 .sub-num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
 .clauses { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; font-size: 12px; }
 .clauses li { padding: 6px 8px; border-left: 3px solid var(--warn); background: var(--bg); border-radius: 4px; }
-.clauses li.high { border-left-color: var(--bad); }
+.clauses li.serious { border-left-color: var(--bad); }

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   analysisKey,
-  BAND_LABEL,
   scoreBand,
   SUB_SCORE_LABEL,
   type AnalysisResult,
@@ -43,19 +42,29 @@ export default function TermsCard({ tabId, site }: { tabId: number; site: string
 
 function Score({ result, url }: { result: AnalysisResult; url: string }) {
   const band = scoreBand(result.trust_score);
-  const top = result.flagged_clauses.filter((c) => c.severity !== "low").slice(0, 3);
+  // Worst first (the backend sorts by points); standard clauses and good signs aren't alerts.
+  const top = result.flagged_clauses.filter((c) => c.tier === "serious" || c.tier === "notable" || c.tier === "other");
+  const shown = top.slice(0, 3);
+  const good = result.flagged_clauses.filter((c) => c.tier === "good");
 
   return (
     <div className="score">
       <div className="score-head">
-        <span className={`score-num ${band}`}>{result.trust_score}</span>
+        <span className={`grade ${band}`}>{result.grade}</span>
         <div>
-          <div className={`band ${band}`}>{BAND_LABEL[band]}</div>
+          <div className={`band ${band}`}>
+            {result.grade_label} · <span className="score-of">{result.trust_score}/100</span>
+          </div>
           <a className="source" href={url} target="_blank" rel="noreferrer">
             {new URL(url).pathname || url}
           </a>
         </div>
       </div>
+      {result.score_notes.map((n) => (
+        <p key={n} className="note">
+          {n}
+        </p>
+      ))}
 
       <div className="subs">
         {(Object.keys(SUB_SCORE_LABEL) as (keyof AnalysisResult["sub_scores"])[]).map((k) => {
@@ -72,15 +81,26 @@ function Score({ result, url }: { result: AnalysisResult; url: string }) {
         })}
       </div>
 
-      {top.length > 0 && (
+      {shown.length > 0 && (
         <ul className="clauses">
-          {top.map((c, i) => (
-            <li key={i} className={c.severity}>
-              <b>{c.category}</b> {c.explanation}
+          {shown.map((c, i) => (
+            <li key={i} className={c.tier}>
+              <div className="clause-head">
+                <b>{c.label}</b>
+                <span className="pts">−{-c.points}</span>
+              </div>
+              {c.explanation}
+              {c.what_you_can_do && (
+                <div className="tip">
+                  <b>What you can do:</b> {c.what_you_can_do}
+                </div>
+              )}
             </li>
           ))}
         </ul>
       )}
+      {top.length > shown.length && <p className="note">+{top.length - shown.length} more issues.</p>}
+      {good.length > 0 && <p className="good-signs">✓ {good.map((c) => c.label).join(" · ")}</p>}
     </div>
   );
 }

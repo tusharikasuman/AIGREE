@@ -10,8 +10,11 @@ def load_prompt(name: str) -> str:
     return (PROMPTS_DIR / name).read_text(encoding="utf-8").strip()
 
 
+@lru_cache
 def system_prompt() -> str:
-    return load_prompt("system_prompt.md")
+    from .checklist import prompt_table
+
+    return load_prompt("system_prompt.md").replace("{{CHECKLIST}}", prompt_table())
 
 
 def merge_prompt() -> str:

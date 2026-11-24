@@ -1,10 +1,20 @@
 export type Severity = "low" | "medium" | "high";
 
+/** serious / notable / standard = checklist red flags by weight; good = good sign; other = not on the checklist. */
+export type Tier = "serious" | "notable" | "standard" | "good" | "other";
+
+export type Grade = "A" | "B" | "C" | "D" | "E";
+
 export interface FlaggedClause {
+  check_id: string;
+  label: string;
   category: string;
+  tier: Tier;
   severity: Severity;
+  points: number; // effect on the trust score: negative = penalty, positive = good sign
   original_text: string;
   explanation: string;
+  what_you_can_do: string;
 }
 
 export interface SubScores {
@@ -17,7 +27,10 @@ export interface SubScores {
 export interface AnalysisResult {
   summary: string;
   trust_score: number;
+  grade: Grade;
+  grade_label: string;
   sub_scores: SubScores;
+  score_notes: string[];
   flagged_clauses: FlaggedClause[];
 }
 

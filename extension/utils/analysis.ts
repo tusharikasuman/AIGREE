@@ -4,17 +4,27 @@ export const API_URL = "http://localhost:8000";
 
 export type Severity = "low" | "medium" | "high";
 
+export type Tier = "serious" | "notable" | "standard" | "good" | "other";
+
 export type FlaggedClause = {
+  check_id: string;
+  label: string;
   category: string;
+  tier: Tier;
   severity: Severity;
+  points: number; // negative = penalty, positive = good sign
   original_text: string;
   explanation: string;
+  what_you_can_do: string;
 };
 
 export type AnalysisResult = {
   summary: string;
   trust_score: number;
+  grade: "A" | "B" | "C" | "D" | "E";
+  grade_label: string;
   sub_scores: { data_privacy: number; financial_risk: number; user_rights: number; exit_clauses: number };
+  score_notes: string[];
   flagged_clauses: FlaggedClause[];
 };
 
@@ -23,7 +33,8 @@ export type SiteAnalysis =
   | { status: "done"; url: string; at: number; result: AnalysisResult }
   | { status: "error"; url?: string; at: number; error: string };
 
-export const analysisKey = (siteKey: string) => `analysis-${siteKey}`;
+// v2: checklist scoring. Results cached by older versions are ignored.
+export const analysisKey = (siteKey: string) => `analysis-v2-${siteKey}`;
 
 /** Same bands as the web app (frontend/lib/colors.ts). Higher = better for the user. */
 export type Band = "good" | "fair" | "poor";
@@ -34,11 +45,6 @@ export function scoreBand(score: number): Band {
   return "poor";
 }
 
-export const BAND_LABEL: Record<Band, string> = {
-  good: "Fair to users",
-  fair: "Some concerns",
-  poor: "High risk",
-};
 
 export const SUB_SCORE_LABEL: Record<keyof AnalysisResult["sub_scores"], string> = {
   data_privacy: "Data privacy",
