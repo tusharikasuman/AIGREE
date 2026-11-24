@@ -1,4 +1,4 @@
-"""Core pipeline: chunk -> analyze each chunk with the LLM -> verify quotes -> merge."""
+"""Core pipeline: chunk -> find checklist items with the LLM -> verify quotes -> score in code."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from typing import TypeVar
 from pydantic import BaseModel, ValidationError
 
 from . import config
+from .checklist import BY_ID
 from .chunker import chunk_text, normalize
 from .prompts import merge_prompt, system_prompt
 from .providers import AnalysisError, Provider, make_provider
@@ -18,15 +19,17 @@ from .schemas import (
     ANALYSIS_JSON_SCHEMA,
     MERGE_JSON_SCHEMA,
     AnalysisResult,
-    FlaggedClause,
+    ChunkAnalysis,
+    Finding,
     MergeResult,
+    OtherConcern,
 )
+from .scoring import score
 
 log = logging.getLogger("aigree.analyzer")
 
 T = TypeVar("T", bound=BaseModel)
-
-SEVERITY_RANK = {"high": 3, "medium": 2, "low": 1}
+Q = TypeVar("Q", Finding, OtherConcern)
 
 __all__ = ["Analyzer", "AnalysisError"]
 
@@ -44,10 +47,11 @@ def _canon(s: str) -> str:
     return re.sub(r"\s+", " ", s.translate(_QUOTE_MAP)).strip().casefold()
 
 
-def verify_clauses(clauses: list[FlaggedClause], source: str) -> list[FlaggedClause]:
+def verify_quotes(items: list[Q], source: str) -> list[Q]:
+    """No quote, no points: drop anything whose quote isn't really in the document."""
     canon_source = _canon(source)
     kept = []
-    for c in clauses:
+    for c in items:
         if _canon(c.original_text) in canon_source:
             kept.append(c)
         else:
@@ -55,15 +59,16 @@ def verify_clauses(clauses: list[FlaggedClause], source: str) -> list[FlaggedCla
     return kept
 
 
-def dedupe_clauses(clauses: list[FlaggedClause]) -> list[FlaggedClause]:
-    """Remove duplicates (chunk overlap can flag the same clause twice), then sort by severity."""
-    result: list[FlaggedClause] = []
-    for c in sorted(clauses, key=lambda c: (-SEVERITY_RANK[c.severity], -len(c.original_text))):
-        key = _canon(c.original_text)
-        # Earlier items are more severe (or longer), so they win ties.
-        if any(key in _canon(k.original_text) or _canon(k.original_text) in key for k in result):
+def dedupe_others(items: list[OtherConcern], findings: list[Finding]) -> list[OtherConcern]:
+    """Drop 'other' concerns that repeat each other or quote a clause already on the checklist."""
+    taken = [_canon(f.original_text) for f in findings]
+    result: list[OtherConcern] = []
+    for o in sorted(items, key=lambda o: (o.severity != "high", -len(o.original_text))):
+        key = _canon(o.original_text)
+        if any(key in k or k in key for k in taken):
             continue
-        result.append(c)
+        taken.append(key)
+        result.append(o)
     return result
 
 
@@ -134,27 +139,29 @@ class Analyzer:
                 ]
         raise AnalysisError(f"The AI returned malformed output twice. Last error: {last_error}")
 
-    async def _analyze_chunk(self, chunk: str, index: int, total: int) -> AnalysisResult:
+    async def _analyze_chunk(self, chunk: str, index: int, total: int) -> ChunkAnalysis:
         if total == 1:
             content = f"<document>\n{chunk}\n</document>\n\nAnalyze the terms above."
         else:
             content = (
                 f'<document part="{index + 1}" of="{total}">\n{chunk}\n</document>\n\n'
-                f"This is part {index + 1} of {total} of a longer document. Analyze only this part; "
-                "base the scores only on what this part says."
+                f"This is part {index + 1} of {total} of a longer document. Report only what this part says."
             )
-        result = await self._call_validated(system_prompt(), content, ANALYSIS_JSON_SCHEMA, AnalysisResult)
-        result.flagged_clauses = verify_clauses(result.flagged_clauses, chunk)
+        result = await self._call_validated(system_prompt(), content, ANALYSIS_JSON_SCHEMA, ChunkAnalysis)
+        result.findings = verify_quotes(result.findings, chunk)
+        result.other_concerns = verify_quotes(result.other_concerns, chunk)
         return result
 
-    async def _merge(self, parts: list[AnalysisResult]) -> MergeResult:
+    async def _merge(self, parts: list[ChunkAnalysis]) -> MergeResult:
         payload = [
-            {"part": i + 1, **p.model_dump()} for i, p in enumerate(parts)
+            {"part": i + 1, "summary": p.summary,
+             "found": [BY_ID[f.check_id].label for f in p.findings] + [o.label for o in p.other_concerns]}
+            for i, p in enumerate(parts)
         ]
         content = (
-            f"Here are the analyses of all {len(parts)} parts of the document:\n\n"
-            f"<part_analyses>\n{json.dumps(payload, ensure_ascii=False, indent=1)}\n</part_analyses>\n\n"
-            "Produce the combined verdict for the whole document."
+            f"Here are the summaries of all {len(parts)} parts of the document:\n\n"
+            f"<part_summaries>\n{json.dumps(payload, ensure_ascii=False, indent=1)}\n</part_summaries>\n\n"
+            "Write the summary for the whole document."
         )
         return await self._call_validated(merge_prompt(), content, MERGE_JSON_SCHEMA, MergeResult)
 
@@ -185,18 +192,10 @@ class Analyzer:
         if not parts:
             raise AnalysisError(NOT_TERMS_MESSAGE, status_code=422)
 
-        if len(parts) == 1:
-            result = parts[0]
-            result.flagged_clauses = dedupe_clauses(result.flagged_clauses)
-            return result
-
-        merged = await self._merge(list(parts))
-        return AnalysisResult(
-            summary=merged.summary,
-            trust_score=merged.trust_score,
-            sub_scores=merged.sub_scores,
-            flagged_clauses=dedupe_clauses([c for p in parts for c in p.flagged_clauses]),
-        )
+        summary = parts[0].summary if len(parts) == 1 else (await self._merge(parts)).summary
+        findings = [f for p in parts for f in p.findings]
+        others = dedupe_others([o for p in parts for o in p.other_concerns], findings)
+        return score(summary, findings, others)
 
 
 def _strip_fences(text: str) -> str:

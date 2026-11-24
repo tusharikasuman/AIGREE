@@ -1,4 +1,4 @@
-import type { Severity } from "./api";
+import type { Tier } from "./api";
 
 /** Score bands: higher score = better for the user. */
 export type Band = "good" | "fair" | "poor";
@@ -9,11 +9,6 @@ export function scoreBand(score: number): Band {
   return "poor";
 }
 
-export const bandLabel: Record<Band, string> = {
-  good: "Fair to users",
-  fair: "Some concerns",
-  poor: "High risk",
-};
 
 export const bandStyles: Record<Band, { text: string; bar: string; ring: string; soft: string }> = {
   good: { text: "text-emerald-700", bar: "bg-emerald-500", ring: "stroke-emerald-500", soft: "bg-emerald-50" },
@@ -21,20 +16,10 @@ export const bandStyles: Record<Band, { text: string; bar: string; ring: string;
   poor: { text: "text-red-700", bar: "bg-red-500", ring: "stroke-red-500", soft: "bg-red-50" },
 };
 
-export const severityStyles: Record<Severity, { card: string; badge: string; label: string }> = {
-  high: {
-    card: "border-red-200 bg-red-50 border-l-red-500",
-    badge: "bg-red-600 text-white",
-    label: "High risk",
-  },
-  medium: {
-    card: "border-amber-200 bg-amber-50 border-l-amber-400",
-    badge: "bg-amber-400 text-amber-950",
-    label: "Medium",
-  },
-  low: {
-    card: "border-emerald-200 bg-emerald-50 border-l-emerald-500",
-    badge: "bg-emerald-600 text-white",
-    label: "Low",
-  },
+export const tierStyles: Record<Tier, { card: string; badge: string; label: string }> = {
+  serious: { card: "border-red-200 bg-red-50 border-l-red-500", badge: "bg-red-600 text-white", label: "Serious" },
+  notable: { card: "border-amber-200 bg-amber-50 border-l-amber-400", badge: "bg-amber-400 text-amber-950", label: "Notable" },
+  other: { card: "border-amber-200 bg-amber-50 border-l-amber-400", badge: "bg-amber-200 text-amber-950", label: "Other concern" },
+  standard: { card: "border-slate-200 bg-slate-50 border-l-slate-400", badge: "bg-slate-500 text-white", label: "Standard" },
+  good: { card: "border-emerald-200 bg-emerald-50 border-l-emerald-500", badge: "bg-emerald-600 text-white", label: "Good sign" },
 };

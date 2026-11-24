@@ -1,6 +1,7 @@
-import { bandLabel, bandStyles, scoreBand } from "@/lib/colors";
+import type { Grade } from "@/lib/api";
+import { bandStyles, scoreBand } from "@/lib/colors";
 
-export default function ScoreRing({ score }: { score: number }) {
+export default function ScoreRing({ score, grade, label }: { score: number; grade: Grade; label: string }) {
   const band = scoreBand(score);
   const r = 52;
   const circumference = 2 * Math.PI * r;
@@ -24,12 +25,14 @@ export default function ScoreRing({ score }: { score: number }) {
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`text-4xl font-bold tabular-nums ${bandStyles[band].text}`}>{score}</span>
-          <span className="text-xs text-slate-500">out of 100</span>
+          <span className={`text-5xl font-bold leading-none ${bandStyles[band].text}`} aria-label={`Grade ${grade}`}>
+            {grade}
+          </span>
+          <span className="mt-1 text-sm font-semibold tabular-nums text-slate-600">{score}/100</span>
         </div>
       </div>
       <p className="mt-2 text-sm font-semibold text-slate-700">Trust score</p>
-      <p className={`text-sm font-medium ${bandStyles[band].text}`}>{bandLabel[band]}</p>
+      <p className={`text-sm font-medium ${bandStyles[band].text}`}>{label}</p>
     </div>
   );
 }
