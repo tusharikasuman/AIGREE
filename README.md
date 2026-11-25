@@ -1,9 +1,10 @@
-# AIGREE: T&C Analyzer (Phase 1)
+# AIGREE: know what you're agreeing to
 
 Paste Terms & Conditions (or a link) and get a plain-language summary, a 0-100 trust score with an A-E grade, four sub-scores, and each red flag with its quote, its effect on the score, and what you can do about it.
 
-- **Backend:** FastAPI + Trafilatura + your choice of AI: **local Qwen via Ollama (free, default)**, OpenAI or any OpenAI-compatible API (Alibaba Qwen, OpenRouter), or Claude
-- **Frontend:** Next.js 15 + Tailwind CSS
+- **Backend:** FastAPI + Trafilatura + your choice of AI: Google Gemini (free tier), local Qwen via Ollama (free, slow on CPU), OpenAI or any OpenAI-compatible API, or Claude
+- **Browser extension** (`extension/`, Phase 2): answers cookie banners for you (**Necessary only** or **Accept all**) and shows the trust score for the site you're on. See [extension/README.md](extension/README.md).
+- **Web app** (`frontend/`): Next.js 15 + Tailwind CSS, for pasting text or a link
 
 ## Folder structure
 
@@ -15,22 +16,26 @@ aigree/
 │   │   ├── analyzer.py      # chunk -> LLM per chunk -> validate/retry -> verify quotes -> merge
 │   │   ├── providers.py     # Ollama / OpenAI-compatible / Claude backends
 │   │   ├── schemas.py       # Pydantic models + JSON schemas sent to the model
+│   │   ├── checklist.py     # the red-flag checklist and its weights
+│   │   ├── scoring.py       # findings -> score, sub-scores, grade (no AI)
 │   │   ├── chunker.py       # paragraph-aware splitting with overlap
 │   │   ├── scraper.py       # Trafilatura URL -> main text
 │   │   ├── prompts.py       # loads the prompt files
 │   │   └── config.py        # env-var settings
 │   ├── prompts/
-│   │   ├── system_prompt.md # main analysis prompt, edit to tune behaviour
-│   │   └── merge_prompt.md  # combines per-chunk results for long documents
+│   │   ├── system_prompt.md # main analysis prompt ({{CHECKLIST}} is filled in from checklist.py)
+│   │   └── merge_prompt.md  # one summary for long documents
 │   ├── samples/sample_tos.txt   # fictional "StreamNest" T&C for testing
 │   ├── scripts/run_sample.py    # CLI: analyze a file or URL, print JSON
-│   ├── requirements.txt
-│   └── .env.example
-└── frontend/
-    ├── app/                 # layout.tsx, page.tsx (input + loading/error/results), globals.css
-    ├── components/          # ScoreRing, SubScores, ClauseList, Results
-    ├── lib/                 # api.ts (types + fetch), colors.ts (score bands, severity colours)
-    └── .env.local.example
+│   ├── Dockerfile
+│   └── requirements.txt
+├── extension/               # Chrome/Edge extension (WXT + React, Manifest V3)
+├── frontend/
+│   ├── app/                 # layout.tsx, page.tsx (input + loading/error/results), globals.css
+│   ├── components/          # ScoreRing, SubScores, ClauseList, Results
+│   ├── lib/                 # api.ts (types + fetch), colors.ts (score bands, tier colours)
+│   └── .env.local.example
+└── docker-compose.yml
 ```
 
 ## How it works
@@ -54,6 +59,7 @@ The checklist and weights live in `backend/app/checklist.py` (the AI prompt is g
   - **Good sign, +5:** for example never sells data, cancel any time, data export.
 - Concerns that aren't on the checklist count −8 (high) or −3 (medium), at most −15 in total.
 - One serious red flag limits the score to 69 (grade C). Two or more limit it to 54 (grade D).
+- An A needs at least one good sign: terms that only avoid red flags get at most 84 (B).
 - Each sub-score counts its own area's points double.
 - Grades: **A** 85+ · **B** 70-84 · **C** 55-69 · **D** 40-54 · **E** below 40.
 
@@ -61,13 +67,18 @@ Higher = better for the user (`financial_risk: 90` means *low* financial risk). 
 
 ## Run it
 
-Needs Python 3.10+, Node 18.18+, and (for the free default) [Ollama](https://ollama.com) with a Qwen model:
+Needs Python 3.10+ and Node 18.18+ (or just Docker), plus an AI provider. The quickest free option is a [Google AI Studio](https://aistudio.google.com/apikey) API key. Create `backend/.env`:
 
-```powershell
-ollama pull qwen2.5:3b
+```ini
+AIGREE_PROVIDER=openai
+AIGREE_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+AIGREE_MODEL=gemini-flash-lite-latest
+AIGREE_JSON_MODE=json_schema
+AIGREE_FALLBACK_MODEL=gemini-3.5-flash
+AIGREE_API_KEY=your-key-here
 ```
 
-On a laptop CPU a local analysis takes a few minutes. A cloud API takes seconds.
+`backend/.env` is git-ignored; never commit it. Other providers are listed under [Choosing the AI](#choosing-the-ai-backendenv). A cloud API takes seconds; a local model on a laptop CPU takes minutes.
 
 ### 1. Backend
 
@@ -76,8 +87,7 @@ cd backend
 python -m venv .venv
 .\.venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
-copy .env.example .env            # macOS/Linux: cp .env.example .env
-# default: local Qwen via Ollama. For another provider, edit .env (see below)
+# create backend/.env first (see above)
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -94,9 +104,9 @@ npm run dev
 
 Open <http://localhost:3000>.
 
-### Docker (Ollama stays on the host)
+### Docker
 
-Start Ollama on your PC first, then:
+If you use Ollama, start it on your PC first (it stays on the host). Then:
 
 ```powershell
 docker compose up -d --build backend    # backend only
@@ -122,11 +132,10 @@ curl -X POST localhost:8000/analyze -H "Content-Type: application/json" \
 
 ## Choosing the AI (`backend/.env`)
 
-`backend/.env.example` has ready-to-uncomment blocks for each option.
-
 | Option | Cost | Settings |
 |---|---|---|
-| **Local Qwen (Ollama)**, the default | Free, runs on your PC (slow on CPU) | `AIGREE_PROVIDER=ollama`, `AIGREE_MODEL=qwen2.5:3b` |
+| **Google Gemini** | Free tier (often busy: requests are retried, then the fallback model is tried) | See [Run it](#run-it) |
+| **Local Qwen (Ollama)** | Free, runs on your PC (slow on CPU) | `AIGREE_PROVIDER=ollama`, `AIGREE_MODEL=qwen2.5:3b` (run `ollama pull qwen2.5:3b` first) |
 | **OpenAI** | Paid (prepaid credits) | `AIGREE_PROVIDER=openai`, `AIGREE_MODEL=gpt-4o-mini`, `AIGREE_API_KEY=sk-...` |
 | **Qwen on Alibaba Model Studio** | Free quota for new accounts, then paid | `AIGREE_PROVIDER=openai`, `AIGREE_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1`, `AIGREE_MODEL=qwen-plus`, `AIGREE_JSON_MODE=json_object`, `AIGREE_API_KEY=...` |
 | **OpenRouter** | Some `:free` models | `AIGREE_PROVIDER=openai`, `AIGREE_BASE_URL=https://openrouter.ai/api/v1`, `AIGREE_MODEL=<id>`, `AIGREE_JSON_MODE=json_object`, `AIGREE_API_KEY=...` |
@@ -140,6 +149,8 @@ Other settings:
 | `AIGREE_OLLAMA_NUM_CTX` | `8192` | Ollama context window |
 | `AIGREE_OLLAMA_THINK` | model default | Set `false` for thinking models like `qwen3.5` to make them faster |
 | `AIGREE_JSON_MODE` | `json_schema` | Use `json_object` for APIs without strict schema support |
+| `AIGREE_MAX_RETRIES` | `5` | Retries with backoff when the AI service is busy (OpenAI-compatible APIs) |
+| `AIGREE_FALLBACK_MODEL` | none | Tried once if the main model is still busy (429/503) after retries |
 | `AIGREE_EFFORT` / `AIGREE_USE_FALLBACKS` | `medium` / `true` | Claude only |
 | `AIGREE_CHUNK_CHARS` | 12000 (ollama) / 30000 | Chunk size |
 | `AIGREE_MAX_INPUT_CHARS` | `400000` | Larger inputs are rejected (413) |
@@ -149,7 +160,10 @@ Restart the backend after editing `.env`. With Docker, use `docker compose up -d
 
 ## Tuning the AI
 
-Edit `backend/prompts/system_prompt.md` (the categories, severity rules and scoring rubric) and restart the server. If you change the category list, also update `Category` in `backend/app/schemas.py`.
+- **What counts and how much:** edit `CHECKS` and the weights in `backend/app/checklist.py`. The prompt's checklist is generated from it, so there's nothing else to update.
+- **How the AI reports findings:** edit `backend/prompts/system_prompt.md`.
+
+Restart the backend afterwards (with Docker: `docker compose up -d --build backend`).
 
 ## API errors
 
@@ -157,7 +171,7 @@ Edit `backend/prompts/system_prompt.md` (the categories, severity rules and scor
 |---|---|
 | 400 | Text too short |
 | 413 | Document too long |
-| 422 | Bad input (both or neither of text/url), URL couldn't be scraped, or the AI declined |
+| 422 | Not a terms document (no score is given), bad input (both or neither of text/url), URL couldn't be scraped, or the AI declined |
 | 429 | Rate-limited by the AI service |
 | 500 | API key missing/invalid, or the Ollama model isn't downloaded |
 | 502 / 503 / 504 | AI service error, malformed output twice, unreachable (e.g. Ollama not running), or timed out |

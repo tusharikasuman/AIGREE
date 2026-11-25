@@ -1,5 +1,5 @@
 import AutoConsent from "@duckduckgo/autoconsent";
-import rules from "@duckduckgo/autoconsent/rules/rules.json";
+import genericRules from "@/utils/rules/generic.json";
 import { choiceFor, getSettings } from "@/utils/settings";
 import type { TermsLinks } from "@/utils/analysis";
 
@@ -9,8 +9,13 @@ export default defineContentScript({
   allFrames: true,
   matchOriginAsFallback: true,
   async main() {
-    const settings = await getSettings();
+    // Rules for any site are bundled here; rules for this specific site come from the background worker.
+    const [settings, siteRules] = await Promise.all([
+      getSettings(),
+      browser.runtime.sendMessage({ type: "aigree-siteRules", url: location.href }).catch(() => []),
+    ]);
     const auto = choiceFor(settings, location.hostname);
+    const rules = { autoconsent: [...(genericRules as any[]), ...((siteRules as any[]) ?? [])] };
 
     const consent = new AutoConsent(
       (msg) => browser.runtime.sendMessage(msg),

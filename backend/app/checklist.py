@@ -28,7 +28,8 @@ SUB_SCORE_MULTIPLIER = 2
 # A serious red flag limits the best possible grade, however good the rest is.
 SERIOUS_CAPS = [(2, 54), (1, 69)]  # (at least this many serious flags, highest possible score)
 
-GRADES = [(85, "A", "Fair to users"), (70, "B", "Mostly fair"), (55, "C", "Some concerns"),
+A_MIN_SCORE = 85
+GRADES = [(A_MIN_SCORE, "A", "Fair to users"), (70, "B", "Mostly fair"), (55, "C", "Some concerns"),
           (40, "D", "Serious concerns"), (0, "E", "High risk")]
 
 

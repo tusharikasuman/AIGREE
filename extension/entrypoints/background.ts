@@ -1,9 +1,16 @@
 import { evalSnippets } from "@duckduckgo/autoconsent";
 import type { ContentScriptMessage } from "@duckduckgo/autoconsent";
-import { tabStatusKey, type TabStatus } from "@/utils/settings";
-import { API_URL, analysisKey, type AnalysisResult, type SiteAnalysis, type TermsLinks } from "@/utils/analysis";
+import siteRules from "@/utils/rules/site.json";
+import { getSettings, tabStatusKey, type TabStatus } from "@/utils/settings";
+import { analysisKey, type AnalysisResult, type SiteAnalysis, type TermsLinks } from "@/utils/analysis";
 
-type AigreeMessage = { type: "aigree-analyze"; tabId: number; site: string };
+type AigreeMessage =
+  | { type: "aigree-analyze"; tabId: number; site: string }
+  | { type: "aigree-siteRules"; url: string };
+
+// Site-specific cookie rules, matched the same way autoconsent does (location.href.match(urlPattern)).
+const SITE_RULES = (siteRules as any[]).map((rule) => ({ rule, pattern: new RegExp(rule.runContext.urlPattern) }));
+const rulesFor = (url: string) => SITE_RULES.filter((r) => r.pattern.test(url)).map((r) => r.rule);
 
 async function setStatus(tabId: number, patch: Partial<TabStatus>) {
   const key = tabStatusKey(tabId);
@@ -38,8 +45,9 @@ async function analyzeSite(tabId: number, site: string) {
   }
   await save({ status: "loading", url, at: Date.now() });
 
+  const apiUrl = (await getSettings()).apiUrl.replace(/\/+$/, "");
   try {
-    const res = await fetch(`${API_URL}/analyze`, {
+    const res = await fetch(`${apiUrl}/analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
@@ -51,12 +59,17 @@ async function analyzeSite(tabId: number, site: string) {
     }
     await save({ status: "done", url, at: Date.now(), result: body as AnalysisResult });
   } catch {
-    await save({ status: "error", url, at: Date.now(), error: `Can't reach the AIGREE server at ${API_URL}. Is it running?` });
+    await save({ status: "error", url, at: Date.now(), error: `Can't reach the AIGREE server at ${apiUrl}. Is it running? (You can change the server under "AIGREE server" below.)` });
   }
 }
 
 export default defineBackground(() => {
-  browser.runtime.onMessage.addListener((msg: ContentScriptMessage | AigreeMessage, sender) => {
+  browser.runtime.onMessage.addListener((msg: ContentScriptMessage | AigreeMessage, sender, sendResponse) => {
+    // From each page/frame as it starts
+    if (msg.type === "aigree-siteRules") {
+      sendResponse(rulesFor(msg.url));
+      return;
+    }
     // From the popup (no sender tab)
     if (msg.type === "aigree-analyze") {
       analyzeSite(msg.tabId, msg.site);

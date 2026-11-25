@@ -6,9 +6,12 @@ export type DefaultChoice = CookieChoice | "ask";
 export type Settings = {
   defaultChoice: DefaultChoice;
   siteChoices: Record<string, CookieChoice>; // hostname -> remembered choice
+  apiUrl: string; // the AIGREE backend that analyses terms
 };
 
-const DEFAULTS: Settings = { defaultChoice: "ask", siteChoices: {} };
+export const DEFAULT_API_URL = "http://localhost:8000";
+
+const DEFAULTS: Settings = { defaultChoice: "ask", siteChoices: {}, apiUrl: DEFAULT_API_URL };
 const KEY = "settings";
 
 export async function getSettings(): Promise<Settings> {
