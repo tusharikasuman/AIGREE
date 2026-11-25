@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .checklist import (
+    A_MIN_SCORE,
     BY_ID,
     OTHER_POINTS,
     OTHER_TOTAL_CAP,
@@ -75,10 +76,10 @@ def score(summary: str, findings: list[Finding], others: list[OtherConcern]) -> 
     good = sum(1 for c in clauses if c.points > 0)
     if red_flags:
         notes = [f"Starts at 100. {_n(red_flags, 'issue')} cost {-penalties} points"
-                 + (f"; {_n(good, 'good sign')} add {bonuses}." if good else ".")]
+                 + (f"; {_n(good, 'good sign')} add{'s' if good == 1 else ''} {bonuses}." if good else ".")]
     else:
         notes = ["Starts at 100. No issues from the checklist were found"
-                 + (f"; {_n(good, 'good sign')} add {bonuses}." if good else ".")]
+                 + (f"; {_n(good, 'good sign')} add{'s' if good == 1 else ''} {bonuses}." if good else ".")]
 
     serious = sum(1 for c in clauses if c.tier == "serious")
     for minimum, cap in SERIOUS_CAPS:
@@ -87,6 +88,14 @@ def score(summary: str, findings: list[Finding], others: list[OtherConcern]) -> 
                 total = cap
                 notes.append(f"Limited to {cap} because of {_n(serious, 'serious red flag')}.")
             break
+
+    # Saying nothing bad isn't the same as being good: an A needs real commitments to the user.
+    if total >= A_MIN_SCORE and good == 0:
+        total = A_MIN_SCORE - 1
+        notes.append(f"Limited to {total}: an A needs at least one good sign, such as a promise not to sell your data.")
+    if red_flags == 0:
+        notes.append("No red flags were found, but that isn't a guarantee. The check can miss things, "
+                     "so read anything important yourself.")
 
     sub_scores = SubScores(**{a: _clamp(100 + SUB_SCORE_MULTIPLIER * p) for a, p in area_points.items()})
     letter, label = grade_for(total)
