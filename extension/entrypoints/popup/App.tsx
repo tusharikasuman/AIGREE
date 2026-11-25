@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  DEFAULT_API_URL,
   getSettings,
   saveSettings,
   siteKey,
@@ -121,7 +122,61 @@ export default function App() {
         ))}
         <p className="hint">Takes effect when a page loads.</p>
       </section>
+
+      <ServerSetting
+        value={settings.apiUrl}
+        onSave={async (apiUrl) => {
+          const next = { ...settings, apiUrl };
+          setSettings(next);
+          await saveSettings(next);
+        }}
+      />
     </main>
+  );
+}
+
+/** Where the terms are sent for analysis. Defaults to a backend running on this computer. */
+function ServerSetting({ value, onSave }: { value: string; onSave: (url: string) => Promise<void> }) {
+  const [draft, setDraft] = useState(value);
+  const [msg, setMsg] = useState("");
+
+  async function save() {
+    const url = draft.trim().replace(/\/+$/, "");
+    if (!/^https?:\/\/[^\s/]+/.test(url)) return setMsg("Enter a full address, e.g. http://localhost:8000");
+    await onSave(url);
+    setDraft(url);
+    try {
+      const r = await fetch(`${url}/health`, { signal: AbortSignal.timeout(5000) });
+      setMsg(r.ok ? "Saved. The server is reachable." : `Saved, but the server answered ${r.status}.`);
+    } catch {
+      setMsg("Saved, but the server can't be reached right now.");
+    }
+  }
+
+  return (
+    <details className="card server">
+      <summary>AIGREE server</summary>
+      <p className="hint">Terms are sent here to be analysed.</p>
+      <div className="server-row">
+        <input
+          type="url"
+          value={draft}
+          spellCheck={false}
+          aria-label="AIGREE server address"
+          onChange={(e) => (setDraft(e.target.value), setMsg(""))}
+          onKeyDown={(e) => e.key === "Enter" && save()}
+        />
+        <button onClick={save} disabled={draft.trim() === value}>
+          Save
+        </button>
+      </div>
+      {msg && <p className="hint">{msg}</p>}
+      {value !== DEFAULT_API_URL && (
+        <button className="link" onClick={() => (setDraft(DEFAULT_API_URL), onSave(DEFAULT_API_URL), setMsg(""))}>
+          Use this computer ({DEFAULT_API_URL})
+        </button>
+      )}
+    </details>
   );
 }
 

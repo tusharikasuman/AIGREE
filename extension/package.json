@@ -5,12 +5,16 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "rules": "node scripts/split-rules.mjs",
+    "predev": "npm run rules",
     "dev": "wxt",
     "dev:edge": "wxt -b edge",
+    "prebuild": "npm run rules",
     "build": "wxt build",
+    "prezip": "npm run rules",
     "zip": "wxt zip",
     "compile": "tsc --noEmit",
-    "postinstall": "wxt prepare"
+    "postinstall": "npm run rules && wxt prepare"
   },
   "dependencies": {
     "@duckduckgo/autoconsent": "18.9.0",

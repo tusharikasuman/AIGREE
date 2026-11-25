@@ -1,7 +1,5 @@
 /** T&C analysis: types shared with the backend, score bands, and the per-site cache. */
 
-export const API_URL = "http://localhost:8000";
-
 export type Severity = "low" | "medium" | "high";
 
 export type Tier = "serious" | "notable" | "standard" | "good" | "other";
